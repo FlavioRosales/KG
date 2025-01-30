@@ -29,9 +29,9 @@ subroutine initial_conditions
   !                 -dexp(-0.5d0*(MoL%x - mu)**2 / sigma**2) * k_f * dsin(k_f*MoL%x)
   MoL%u(3,:,:,:) = 0.0d0
   MoL%u(4,:,:,:) = 0.0d0
-  partial_t_phi = -MoL%beta(1,:,:,:)/MoL%alpha * MoL%u(1,:,:,:)
-         ! -(MoL%x - mu)/sigma**2 * MoL%u(1,:,:,:)  &
-         !-  dexp(-0.5d0*(MoL%x - mu)**2 / sigma**2)/MoL%x * k_f * dsin(k_f*MoL%x)
+  partial_t_phi = &!-MoL%beta(1,:,:,:)/MoL%alpha * MoL%u(1,:,:,:)
+          -(MoL%x - mu)/sigma**2 * MoL%u(1,:,:,:)  &
+         -  dexp(-0.5d0*(MoL%x - mu)**2 / sigma**2)/MoL%x * k_f * dsin(k_f*MoL%x)
         !-MoL%u(1,:,:,:) * (MoL%x - mu)/sigma**2 
         !MoL%beta(1,:,:,:) * MoL%u(2,:,:,:)
   MoL%u(5,:,:,:) = MoL%sqrtg / MoL%alpha * (partial_t_phi - (&

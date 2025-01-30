@@ -31,9 +31,9 @@ contains
   !============================================================================!
   subroutine rhs(refinement)
     use finite_differences, &
-    dx1 => first_derivative_x_4, &
-    dx2 => first_derivative_y_4, &
-    dx3 => first_derivative_z_4
+    dx1 => first_derivative_x_2, &
+    dx2 => first_derivative_y_2, &
+    dx3 => first_derivative_z_2
     implicit none
     integer, intent(in) :: refinement
 
@@ -74,8 +74,8 @@ contains
     dx3(MoL%beta(3,:,:,:) * MoL%u(5,:,:,:) + MoL%alpha * MoL%sqrtg * (&
     MoL%gamma_up(3,1,:,:,:) * MoL%u(2,:,:,:) + &
     MoL%gamma_up(3,2,:,:,:) * MoL%u(3,:,:,:) + &
-    MoL%gamma_up(3,3,:,:,:) * MoL%u(4,:,:,:) ), MoL%dz) + &
-    MoL%alpha * MoL%sqrtg * MoL%m**2 * MoL%u(1,:,:,:)**2
+    MoL%gamma_up(3,3,:,:,:) * MoL%u(4,:,:,:) ), MoL%dz) - &
+    MoL%alpha * MoL%sqrtg * MoL%m**2 * MoL%u(1,:,:,:)
     
 
   end subroutine rhs
