@@ -18,7 +18,9 @@ module lines_method_lib
     real(kind=8) :: tmin, tmax, CFL
     real(kind=8) :: m !masa del bosón
     real(kind=8) :: t, dt
-    real(kind=8), allocatable, dimension(:) :: r_det, flux
+    real(kind=8), allocatable, dimension(:) :: r_det, flux, current
+    real(kind=8) :: Mass_scalar
+    integer, allocatable, dimension(:) :: index_det
     real(kind=8), allocatable, dimension(:,:,:,:) :: rhs_u
     real(kind=8), allocatable, dimension(:,:,:,:) :: u, u_p
     character(len=20) :: boundary_type_rmax
@@ -28,6 +30,8 @@ module lines_method_lib
     procedure :: lines_method_info
     procedure :: rk3
     procedure :: diagnostic
+    procedure :: phi_max, phi_min
+
     procedure, private :: lines_method_memory
 
     procedure, private :: send_recv_xL, send_recv_xR
@@ -48,12 +52,14 @@ contains
   !============================================================================!
   function lines_method_constructor(&
      nvars, g_pts, xmin, xmax, Nx, Ny, Nz, tmin, tmax, CFL, &
-     boundary_type_rmax, metric, m, n_det, first_det, space_det) result(this)
+     boundary_type_rmax, metric, a, M_bh, m, n_det, first_det, space_det) result(this)
     implicit none
     integer, intent(in) ::  nvars, g_pts, Nx, Ny, Nz
     integer, intent(in) :: n_det
+    real(kind=8), intent(in) :: a, M_bh
     real(kind=8), intent(in) :: first_det, space_det
     real(kind=8), intent(in) :: xmin, xmax, tmin, tmax, CFL, m
+    real(kind=8) :: dx_aux, dxx 
     character(len=*) :: boundary_type_rmax, metric
     type(lines_method) :: this
     integer i
@@ -71,8 +77,10 @@ contains
     this%jL = 0; this%jR = this%Ny
     this%kL = 0; this%kR = this%Nz
     this%m = m
+    this%a = a
+    this%M_bh = M_bh 
 
-    print*, ' boson mass m_b = ', this%m
+    this%n_det = 2
 
     this%xmin = xmin
     this%xmax = xmax
@@ -86,15 +94,20 @@ contains
     call this%lines_method_memory()
     this%tmin = tmin; this%tmax = tmax; this%CFL = CFL
     !this%dt = CFL * min(this%dx, this%dy, this%dz)
-    this%dt = CFL * min(this%dx, (xmin+this%dx)*this%dy, &
-      (xmin+this%dx)*sin(this%dy/2.0d0)*this%dz)
+    dx_aux = exp(this%x(this%iL - this%g_pts+1,1,1)-this%x(this%iL - this%g_pts,1,1))
+
+    call MPI_ALLREDUCE(dx_aux, dxx, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, ierr)
+
+    this%dt = CFL * min(dxx, (exp(xmin))*this%dy, &
+      (exp(xmin))*sin(this%dy/2.0d0)*this%dz)
 
     !Max aristas 
 
-    print*, 'dr_max', this%dx 
-    print*, 'dtheta_max', this%x(this%iR + this%g_pts,1,1)*this%dy
-    print*, 'dphi_max', this%x(this%iR + this%g_pts,1,1)*this%dz
-
+    if(rank.eq.(nproc-1)) then 
+      print*, 'dr_max', this%dx 
+      print*, 'dtheta_max', this%x(this%iR + this%g_pts,1,1)*this%dy
+      print*, 'dphi_max', this%x(this%iR + this%g_pts,1,1)*this%dz
+    end if
 
     this%Nt = int((this%tmax - this%tmin) / this%dt)
     if(mod(this%Nt,2).ne.0) this%Nt = this%Nt + 1
@@ -107,13 +120,16 @@ contains
     call this%geometry_memory
     call this%geometry_load_metric
     call this%geometry_load_inverse
+    call this%validate_inverse_metric
 
-    !radius detectors
-    this%n_det = n_det
+    this%r_det(1) = (1.0d0 + dsqrt(1.0d0 - this%a**2)) !detector horizon
+    
+    if(metric == 'MKS') then ! detector inifinity
+      this%r_det(2) = exp(xmax)
+    else  
+      this%r_det(2) = xmax
+    end if
 
-    do i=1, this%n_det
-      this%r_det(i) = first_det + dble(i-1)*space_det
-    end do
 
 
   end function lines_method_constructor
@@ -139,6 +155,8 @@ contains
 
     allocate(this%r_det(this%n_det))
     allocate(this%flux(this%n_det))
+    allocate(this%current(this%n_det))
+    allocate(this%index_det(this%n_det))
 
 
   end subroutine lines_method_memory
@@ -268,7 +286,7 @@ contains
     ! boundary xL == r_min, radius of excision
     ! third order extrapolations
 
-    ! this%u(:,this%iL-this%g_pts,:,:) = this%u(:,this%iL-this%g_pts -1,:,:)
+     !this%u(:,this%iL-this%g_pts,:,:) = this%u(:,this%iL-this%g_pts+1,:,:)
 
       this%u(:,this%iL-this%g_pts,:,:) = 3.0d0*this%u(:,this%iL-this%g_pts+1,:,:) &
             -3.0d0*this%u(:,this%iL-this%g_pts+2,:,:) + this%u(:,this%iL-this%g_pts+3,:,:)
@@ -313,16 +331,23 @@ contains
     class(lines_method), intent(in out) :: this
       integer :: i,k,dis,j, g
 
-      dis = (this%Nz+1)/2
+      dis = (this%Nz+ 1)/2
 
       do k = this%kL, this%kR
         do g=this%g_pts, 0, -1
-        if(k.ge.abs(dis)) dis = -abs(dis)
-          this%u(1,:,this%jL-g,k) = this%u(1,:,this%jL+g+1,k+dis)
-          this%u(2,:,this%jL-g,k) = this%u(2,:,this%jL+g+1,k+dis)
-          this%u(3,:,this%jL-g,k) = -this%u(3,:,this%jL+g+1,k+dis)
-          this%u(4,:,this%jL-g,k) = this%u(4,:,this%jL+g+1,k+dis)
-          this%u(5,:,this%jL-g,k) = this%u(5,:,this%jL+g+1,k+dis)
+          if(k.lt.dis) then 
+            this%u(1,:,this%jL-g,k) = this%u(1,:,this%jL+g+1,k+dis)
+            this%u(2,:,this%jL-g,k) = this%u(2,:,this%jL+g+1,k+dis)
+            this%u(3,:,this%jL-g,k) = -this%u(3,:,this%jL+g+1,k+dis)
+            this%u(4,:,this%jL-g,k) = -this%u(4,:,this%jL+g+1,k+dis)
+            this%u(5,:,this%jL-g,k) = this%u(5,:,this%jL+g+1,k+dis)
+          else 
+            this%u(1,:,this%jL-g,k) = this%u(1,:,this%jL+g+1,k-dis)
+            this%u(2,:,this%jL-g,k) = this%u(2,:,this%jL+g+1,k-dis)
+            this%u(3,:,this%jL-g,k) = -this%u(3,:,this%jL+g+1,k-dis)
+            this%u(4,:,this%jL-g,k) = -this%u(4,:,this%jL+g+1,k-dis)
+            this%u(5,:,this%jL-g,k) = this%u(5,:,this%jL+g+1,k-dis)
+          end if
         end do
       end do
 
@@ -336,16 +361,23 @@ contains
     class(lines_method), intent(in out) :: this
       integer :: i,k,dis,j,g
 
-      dis = (this%Nz + 1)/2
+      dis = (this%Nz+1)/2
 
       do k = this%kL, this%kR
         do g= this%g_pts, 0, -1
-        if(k.ge.abs(dis)) dis = -abs(dis)
+        if(k.lt.dis) then 
           this%u(1,:,this%jR + g,k) = this%u(1,:,this%jR-g-1,k+dis)
           this%u(2,:,this%jR + g,k) = this%u(2,:,this%jR-g-1,k+dis)
           this%u(3,:,this%jR + g,k) = -this%u(3,:,this%jR-g-1,k+dis)
-          this%u(4,:,this%jR + g,k) = this%u(4,:,this%jR-g-1,k+dis)
+          this%u(4,:,this%jR + g,k) = -this%u(4,:,this%jR-g-1,k+dis)
           this%u(5,:,this%jR + g,k) = this%u(5,:,this%jR-g-1,k+dis)
+        else 
+          this%u(1,:,this%jR + g,k) = this%u(1,:,this%jR-g-1,k-dis)
+          this%u(2,:,this%jR + g,k) = this%u(2,:,this%jR-g-1,k-dis)
+          this%u(3,:,this%jR + g,k) = -this%u(3,:,this%jR-g-1,k-dis)
+          this%u(4,:,this%jR + g,k) = -this%u(4,:,this%jR-g-1,k-dis)
+          this%u(5,:,this%jR + g,k) = this%u(5,:,this%jR-g-1,k-dis)
+        end if
         end do
       end do
 
@@ -447,23 +479,117 @@ contains
     class(lines_method), intent(in out) :: this
     real(kind=8), dimension( & 
         this%jL - this%g_pts:this%jR + this%g_pts, &
-        this%kL:this%kR) :: flux_shell
-    integer :: i_det
+        this%kL:this%kR) :: flux_shell, shell, e_current
+    real(kind=8), dimension( & 
+        this%jL - this%g_pts:this%jR + this%g_pts, &
+        this%kL:this%kR) :: f_den, dt_phi, phi_dr, phi_dt
+    real(kind=8) :: DeltaV    
+    real(kind=8), dimension(this%iL-this%g_pts:this%iR+this%g_pts) :: r_aux
     integer :: l, i
 
+    r_aux = this%x(:,1,1)
+    if(this%metric == 'MKS') r_aux = dexp(r_aux)
+
     do l=1, this%n_det
-    if((this%x(this%iL,1,1).le.this%r_det(l)).and.(this%r_det(l).ge.this%x(this%iR,1,1))) then 
-        do i=this%iL, this%iR
-            if((this%x(i,1,1).le.this%r_det(l)).and.(this%x(i+1,1,1).gt.this%r_det(l))) then
-                i_det = i
-                print*,rank
-            end if
-        end do
-    end if
-    flux_shell = this%u(2,i_det,:,:) * this%alpha(i_det,:,:) * this%sqrtg(i_det,:,:) 
-    this%flux(l) = trapezium_2D(flux_shell,this%dy,this%dz)
+      if(rank.eq.0) then 
+        if((r_aux(this%iL -this%g_pts).le.this%r_det(l)).and.(r_aux(this%iR).gt.this%r_det(l))) then
+          ! Superficie de la esfera donde estamos integrando  
+            Shell = this%alpha(this%index_det(l),:,:) * this%sqrtg(this%index_det(l),:,:)
+            DeltaV = trapezium_2D(Shell,this%dy,this%dz)
+          ! Flujo del campo escalar
+            flux_shell = this%u(2,this%index_det(l),:,:) * this%alpha(this%index_det(l),:,:) * this%sqrtg(this%index_det(l),:,:) 
+            this%flux(l) = trapezium_2D(flux_shell,this%dy,this%dz)/DeltaV
+          ! Corriente de energía que cruza sobre la superficie 
+            dt_phi = this%alpha(this%index_det(l),:,:)/this%sqrtg(this%index_det(l),:,:) * this%u(5,this%index_det(l),:,:) &
+                    + this%beta(1,this%index_det(l),:,:)*this%u(2,this%index_det(l),:,:) & 
+                    + this%beta(2,this%index_det(l),:,:)*this%u(3,this%index_det(l),:,:) & 
+                    + this%beta(3,this%index_det(l),:,:)*this%u(4,this%index_det(l),:,:) 
+
+            phi_dt = this%g_up(0,0,this%index_det(l),:,:)*dt_phi &
+                    + this%g_up(0,1,this%index_det(l),:,:)*this%u(2,this%index_det(l),:,:) 
+
+            phi_dr = this%g_up(0,1,this%index_det(l),:,:)*dt_phi &
+                    + this%g_up(1,1,this%index_det(l),:,:)*this%u(2,this%index_det(l),:,:) &
+                    + this%g_up(1,3,this%index_det(l),:,:)*this%u(3,this%index_det(l),:,:)
+
+            f_den = this%g_up(0,0,this%index_det(l),:,:)*dt_phi**2 &
+                  + this%g_up(1,1,this%index_det(l),:,:)*this%u(2,this%index_det(l),:,:) &
+                  + this%g_up(2,2,this%index_det(l),:,:)*this%u(3,this%index_det(l),:,:) &
+                  + this%g_up(3,3,this%index_det(l),:,:)*this%u(4,this%index_det(l),:,:) & 
+                  + 2.0d0*(this%g_up(0,1,this%index_det(l),:,:)*dt_phi*this%u(2,this%index_det(l),:,:) &
+                    + this%g_up(1,4,this%index_det(l),:,:)*this%u(2,this%index_det(l),:,:)*this%u(4,this%index_det(l),:,:) &
+                          )
+
+            e_current =( phi_dt * phi_dr - 0.5d0 * this%g_up(0,1,this%index_det(l),:,:)*f_den) & 
+                        * this%alpha(this%index_det(l),:,:) * this%sqrtg(this%index_det(l),:,:)
+
+            this%current(l) = trapezium_2D(e_current,this%dy,this%dz)/DeltaV
+
+        end if
+      else   
+        if((r_aux(this%iL).le.this%r_det(l)).and.(r_aux(this%iR).gt.this%r_det(l))) then 
+          ! Superficie de la esfera donde estamos integrando  
+          Shell = this%alpha(this%index_det(l),:,:) * this%sqrtg(this%index_det(l),:,:)
+          DeltaV = trapezium_2D(Shell,this%dy,this%dz)
+        ! Flujo del campo escalar
+          flux_shell = this%u(2,this%index_det(l),:,:) * this%alpha(this%index_det(l),:,:) * this%sqrtg(this%index_det(l),:,:) 
+          this%flux(l) = trapezium_2D(flux_shell,this%dy,this%dz)/DeltaV
+        ! Corriente de energía que cruza sobre la superficie 
+          dt_phi = this%alpha(this%index_det(l),:,:)/this%sqrtg(this%index_det(l),:,:) * this%u(5,this%index_det(l),:,:) &
+                  + this%beta(1,this%index_det(l),:,:)*this%u(2,this%index_det(l),:,:) & 
+                  + this%beta(2,this%index_det(l),:,:)*this%u(3,this%index_det(l),:,:) & 
+                  + this%beta(3,this%index_det(l),:,:)*this%u(4,this%index_det(l),:,:) 
+
+          phi_dt = this%g_up(0,0,this%index_det(l),:,:)*dt_phi &
+                  + this%g_up(0,1,this%index_det(l),:,:)*this%u(2,this%index_det(l),:,:) 
+
+          phi_dr = this%g_up(0,1,this%index_det(l),:,:)*dt_phi &
+                  + this%g_up(1,1,this%index_det(l),:,:)*this%u(2,this%index_det(l),:,:) &
+                  + this%g_up(1,3,this%index_det(l),:,:)*this%u(3,this%index_det(l),:,:)
+
+          f_den = this%g_up(0,0,this%index_det(l),:,:)*dt_phi**2 &
+                + this%g_up(1,1,this%index_det(l),:,:)*this%u(2,this%index_det(l),:,:) &
+                + this%g_up(2,2,this%index_det(l),:,:)*this%u(3,this%index_det(l),:,:) &
+                + this%g_up(3,3,this%index_det(l),:,:)*this%u(4,this%index_det(l),:,:) & 
+                + 2.0d0*(this%g_up(0,1,this%index_det(l),:,:)*dt_phi*this%u(2,this%index_det(l),:,:) &
+                  + this%g_up(1,4,this%index_det(l),:,:)*this%u(2,this%index_det(l),:,:)*this%u(4,this%index_det(l),:,:) &
+                        )
+
+          e_current = (phi_dt * phi_dr - 0.5d0 * this%g_up(0,1,this%index_det(l),:,:)*f_den ) & 
+                      * this%alpha(this%index_det(l),:,:) * this%sqrtg(this%index_det(l),:,:)
+
+          this%current(l) = trapezium_2D(e_current,this%dy,this%dz)/DeltaV
+
+        end if
+      end if
     end do
+
+    this%Mass_scalar = integrate(this%u(1,:,:,:)*this%alpha*this%sqrtg,this%dx,this%dy,this%dz, this%g_pts)
+
+
+    
+
   end subroutine diagnostic
+
+  real(kind=8) function phi_max(this) 
+  use mpi_lib
+  class(lines_method), intent(in out) :: this 
+
+  phi_max = 0.0d0
+  call MPI_ALLREDUCE(maxval(this%u(1,this%iL:this%iR,this%jL-this%g_pts:this%jR+this%g_pts,this%kL:this%kR)), &
+  phi_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_WORLD, ierr)
+
+  end function phi_max
+
+  real(kind=8) function phi_min(this) 
+  use mpi_lib
+  class(lines_method), intent(in out) :: this 
+
+  phi_min = 0.0d0
+  call MPI_ALLREDUCE(maxval(this%u(1,this%iL:this%iR,this%jL-this%g_pts:this%jR+this%g_pts,this%kL:this%kR)), &
+  phi_min, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_WORLD, ierr)
+
+  end function phi_min
 
 
 end module lines_method_lib

@@ -10,8 +10,7 @@ contains
     implicit none
     real(kind=8), intent(in) :: t, f
     character(len=*), intent(in) :: name
-
-    if(rank.eq.master) call save0d(t, f, name + '.t.asc')
+    call save0d(t, f, name + '.t.asc')
 
   end subroutine save_t
 

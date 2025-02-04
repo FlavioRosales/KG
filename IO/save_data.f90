@@ -21,9 +21,12 @@ contains
     integer :: ios, iounit
     logical :: exist
 
+
     exist = .false.
     iounit = 100
     inquire(file = name%string_data, exist = exist)
+
+
 
     if(exist) then
 
@@ -36,7 +39,6 @@ contains
       if ( ios /= 0 ) stop "Error closing file unit "
 
     else
-
       open(unit=iounit, file=name%string_data, iostat=ios, status="new", action="write")
       if ( ios /= 0 ) stop "Error opening file "
 

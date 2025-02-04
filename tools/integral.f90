@@ -169,7 +169,7 @@ contains
 
     iL = 1 + g_pts; iR = size(f3d,1) - g_pts
     jL = 1 + g_pts; jR = size(f3d,2) - g_pts
-    kL = 1 + g_pts; kR = size(f3d,3) - g_pts
+    kL = 1 ; kR = size(f3d,3) 
 
     f0d = 0.0d0
     int = trapezium(f3d = f3d(iL:iR,jL:jR,kL:kR),dx =  dx, dy = dy, dz = dz)

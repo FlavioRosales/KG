@@ -249,11 +249,12 @@ def write_vector_xml(path, namefile_h5, dt = 0.0):
     new_file.close()
 
 
-path = './test'
+path = '/home/flavio/Codes/KG/main/exe/test/'
 dt = 5*6.60E-03
 
 print('Hola mundo')
 
 write_xml(path = path, namefile_h5 = 'phi.h5', dt = dt)
+write_xml(path = path, namefile_h5 = 'phi2.h5', dt = dt)
 
 print('Adios mundo')

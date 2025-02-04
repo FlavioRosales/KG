@@ -656,6 +656,117 @@ contains
 
 
   end function Laplacian_6
-  !=============================================================================!
+ !=============================================================================!
+function advec_x(f, beta, dx) result(df)
+  implicit none
+  ! Input
+  real(kind=8), intent(in) :: f(0:,0:,0:), beta(0:,0:,0:), dx
+  ! Output
+  real(kind=8), dimension(0:size(f,1)-1, 0:size(f,2)-1, 0:size(f,3)-1) :: df
+  ! Internal
+  real(kind=8) :: res
+  integer :: i, j, k, N
+
+  res = 0.5d0 / dx
+  N = size(f,1) - 1
+
+  df(0,:,:) = (-3.0d0 * f(0,:,:) + 4.0d0 * f(1,:,:) - f(2,:,:)) * res
+  df(N,:,:) = (3.0d0 * f(N,:,:) - 4.0d0 * f(N-1,:,:) + f(N-2,:,:)) * res
+
+  do k = 0, size(f,3)-1
+    do j = 0, size(f,2)-1
+      do i = 1, N-1
+        if (beta(i,j,k) > 0.0d0) then
+          df(i,j,k) = merge((f(i+1,j,k) - f(i,j,k)) / dx, &
+                            (-3.0d0 * f(i,j,k) + 4.0d0 * f(i+1,j,k) - f(i+2,j,k)) * res, &
+                            i == N-1)
+        else if (beta(i,j,k) == 0.0d0) then
+          df(i,j,k) = (f(i+1,j,k) - f(i-1,j,k)) * res
+        else
+          df(i,j,k) = merge((f(i,j,k) - f(i-1,j,k)) / dx, &
+                            (3.0d0 * f(i,j,k) - 4.0d0 * f(i-1,j,k) + f(i-2,j,k)) * res, &
+                            i == 1)
+        end if
+      end do
+    end do
+  end do
+
+end function advec_x
+!=============================================================================!
+
+function advec_y(f, beta, dy) result(df)
+  implicit none
+  ! Input
+  real(kind=8), intent(in) :: f(0:,0:,0:), beta(0:,0:,0:), dy
+  ! Output
+  real(kind=8), dimension(0:size(f,1)-1, 0:size(f,2)-1, 0:size(f,3)-1) :: df
+  ! Internal
+  real(kind=8) :: res
+  integer :: i, j, k, N
+
+  res = 0.5d0 / dy
+  N = size(f,2) - 1
+
+  df(:,0,:) = (-3.0d0 * f(:,0,:) + 4.0d0 * f(:,1,:) - f(:,2,:)) * res
+  df(:,N,:) = (3.0d0 * f(:,N,:) - 4.0d0 * f(:,N-1,:) + f(:,N-2,:)) * res
+
+  do k = 0, size(f,3)-1
+    do i = 0, size(f,1)-1
+      do j = 1, N-1
+        if (beta(i,j,k) > 0.0d0) then
+          df(i,j,k) = merge((f(i,j+1,k) - f(i,j,k)) / dy, &
+                            (-3.0d0 * f(i,j,k) + 4.0d0 * f(i,j+1,k) - f(i,j+2,k)) * res, &
+                            j == N-1)
+        else if (beta(i,j,k) == 0.0d0) then
+          df(i,j,k) = (f(i,j+1,k) - f(i,j-1,k)) * res
+        else
+          df(i,j,k) = merge((f(i,j,k) - f(i,j-1,k)) / dy, &
+                            (3.0d0 * f(i,j,k) - 4.0d0 * f(i,j-1,k) + f(i,j-2,k)) * res, &
+                            j == 1)
+        end if
+      end do
+    end do
+  end do
+
+end function advec_y
+!=============================================================================!
+
+function advec_z(f, beta, dz) result(df)
+  implicit none
+  ! Input
+  real(kind=8), intent(in) :: f(0:,0:,0:), beta(0:,0:,0:), dz
+  ! Output
+  real(kind=8), dimension(0:size(f,1)-1, 0:size(f,2)-1, 0:size(f,3)-1) :: df
+  ! Internal
+  real(kind=8) :: res
+  integer :: i, j, k, N
+
+  res = 0.5d0 / dz
+  N = size(f,3) - 1
+
+  df(:,:,0) = (-3.0d0 * f(:,:,0) + 4.0d0 * f(:,:,1) - f(:,:,2)) * res
+  df(:,:,N) = (3.0d0 * f(:,:,N) - 4.0d0 * f(:,:,N-1) + f(:,:,N-2)) * res
+
+  do j = 0, size(f,2)-1
+    do i = 0, size(f,1)-1
+      do k = 1, N-1
+        if (beta(i,j,k) > 0.0d0) then
+          df(i,j,k) = merge((f(i,j,k+1) - f(i,j,k)) / dz, &
+                            (-3.0d0 * f(i,j,k) + 4.0d0 * f(i,j,k+1) - f(i,j,k+2)) * res, &
+                            k == N-1)
+        else if (beta(i,j,k) == 0.0d0) then
+          df(i,j,k) = (f(i,j,k+1) - f(i,j,k-1)) * res
+        else
+          df(i,j,k) = merge((f(i,j,k) - f(i,j,k-1)) / dz, &
+                            (3.0d0 * f(i,j,k) - 4.0d0 * f(i,j,k-1) + f(i,j,k-2)) * res, &
+                            k == 1)
+        end if
+      end do
+    end do
+  end do
+
+end function advec_z
+!=============================================================================!
+
 
 end module finite_differences

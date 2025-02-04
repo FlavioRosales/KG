@@ -4,7 +4,7 @@ FC = mpifort
 #FC=gfortran
 #FC=/opt/intel/bin/ifort
 
-FFLAGS = -g -O3 #-fbounds-check -fcheck=all -fbacktrace
+FFLAGS = -g -O3 # -fbounds-check -fcheck=all -fbacktrace
 #FFLAGS = -g
 
 #LNK = mpif90
