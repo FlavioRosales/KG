@@ -51,6 +51,64 @@ contains
 
   end subroutine save0d
   !=============================================================================!
+  subroutine savealm(f, name, l_max)
+    implicit none
+    !
+    ! input
+    !
+    integer, intent(in) :: l_max
+    complex(kind=8), intent(in) :: f(0:l_max,-l_max:l_max)
+    type(string) :: name
+    !
+    ! internal
+    !
+    integer :: l, m
+    integer :: ios, iounit
+    logical :: exist
+
+
+    exist = .false.
+    iounit = 100
+    inquire(file = name%string_data, exist = exist)
+
+
+
+
+    if(exist) then
+
+      open(unit=iounit, file=name%string_data, iostat=ios, status="old", action="write", position = 'append')
+      if ( ios /= 0 ) stop "Error opening file "
+
+        do l=0, l_max
+          do m=-l, l 
+            write(iounit, *) l, m,dreal(f(l,m)), dimag(f(l,m)), abs(f(l,m))
+          end do
+        end do
+        write(iounit, *)
+        write(iounit, *)
+
+      close(unit=iounit, iostat=ios)
+      if ( ios /= 0 ) stop "Error closing file unit "
+
+    else
+      open(unit=iounit, file=name%string_data, iostat=ios, status="new", action="write")
+      if ( ios /= 0 ) stop "Error opening file "
+
+      do l=0, l_max
+        do m=-l, l 
+          write(iounit, *) l,m, dreal(f(l,m)), dimag(f(l,m)), abs(f(l,m))
+        end do
+      end do
+      write(iounit, *)
+      write(iounit, *)
+      
+      close(unit=iounit, iostat=ios)
+      if ( ios /= 0 ) stop "Error closing file unit "
+
+    end if
+
+  end subroutine savealm
+  !=============================================================================!
   subroutine save1d(x, f, name)
     implicit none
     !
@@ -103,6 +161,59 @@ contains
     end if
 
   end subroutine save1d
+  !=============================================================================!
+  subroutine save1d_k(x, f, name)
+    implicit none
+    !
+    ! input
+    !
+    real(kind=8), dimension(:), intent(in) :: x, f
+    type(string) :: name
+    !
+    ! internal
+    !
+    integer :: i, j, ios, iounit
+    logical :: exist
+
+    
+
+    iounit = 200
+    inquire(file = name%string_data, exist = exist)
+
+    if(exist) then
+
+      open(unit=iounit, file=name%string_data, iostat=ios, status="old", action="write", position = 'append')
+      if ( ios /= 0 ) then
+        stop "Error opening file "
+      end if
+
+      do i=1, size(x)
+          write(iounit, *) x(i), f(i)
+      end do
+        write(iounit, *)
+        write(iounit, *)
+
+      close(unit=iounit, iostat=ios)
+      if ( ios /= 0 ) stop "Error closing file unit "
+
+    else
+      open(unit=iounit, file=name%string_data, iostat=ios, status="new", action="write")
+      if ( ios /= 0 ) then
+        print*, 'falla archivo ', name%string_data
+        stop "Error opening file "
+      end if
+        do i=1, size(x)
+              write(iounit, *) x(i), f(i)
+        end do
+          write(iounit, *)
+          write(iounit, *)
+
+      close(unit=iounit, iostat=ios)
+      if ( ios /= 0 ) stop "Error closing file unit "
+
+    end if
+
+  end subroutine save1d_k
   !=============================================================================!
   subroutine save2d(x, y, f, name)
     implicit none

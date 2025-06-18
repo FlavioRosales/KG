@@ -42,7 +42,6 @@ def write_xml(path, namefile_h5, dt = 0.0):
     # star xmf file
     #
     namefile_xmf = namefile_h5.split(".")[0] + ".xmf"
-
     new_file = open(namefile_xmf,"w")
 
     new_file.write('<?xml version="1.0" ?>\n')
@@ -249,12 +248,20 @@ def write_vector_xml(path, namefile_h5, dt = 0.0):
     new_file.close()
 
 
-path = '/home/flavio/Codes/KG/main/exe/test/'
-dt = 5*6.60E-03
+path = '/home/flavio/Codes/KG/main/exe/test_6/'
+dt = 0.5
 
 print('Hola mundo')
 
 write_xml(path = path, namefile_h5 = 'phi.h5', dt = dt)
-write_xml(path = path, namefile_h5 = 'phi2.h5', dt = dt)
+write_xml(path = path, namefile_h5 = 'psix.h5', dt = dt)
+write_xml(path = path, namefile_h5 = 'psiy.h5', dt = dt)
+write_xml(path = path, namefile_h5 = 'psiz.h5', dt = dt)
+write_xml(path = path, namefile_h5 = 'pi.h5', dt = dt)
+write_xml(path = path, namefile_h5 = 'delta.h5', dt = dt)
+write_xml(path = path, namefile_h5 = 'rho.h5', dt = dt)
+write_xml(path = path, namefile_h5 = 'jr.h5', dt = dt)
+write_xml(path = path, namefile_h5 = 'jtheta.h5', dt = dt)
+write_xml(path = path, namefile_h5 = 'jphi.h5', dt = dt)
 
 print('Adios mundo')

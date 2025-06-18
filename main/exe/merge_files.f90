@@ -195,7 +195,7 @@ integer function files_counter(file_name, file_extension, file_axis, np)
         write(name, '(a,a,i0,a,a,a)') trim(file_name), '_', i, '.', trim(file_axis), trim(file_extension)
         open(unit=i, file=name, iostat=ios, status="old", action="read")
             if(ios/=0) stop 'Error opening file'
-        non_duplicate = .true.
+        non_duplicate = .false.
         read(i,*) first_value_axis(i), fun
         if(i.gt.1) then
          do k=i-1, 1, -1
@@ -237,7 +237,7 @@ subroutine index(file_name, file_extension, file_axis, np, index_files, num)
         write(name, '(a,a,i0,a,a,a)') trim(file_name), '_', i, '.', trim(file_axis), trim(file_extension)
         open(unit=i, file=name, iostat=ios, status="old", action="read")
             if(ios/=0) stop 'Error opening file'
-        non_duplicate = .true.
+        non_duplicate = .false.
         read(i,*) first_value_axis(i), fun
         
         if(i.gt.1) then

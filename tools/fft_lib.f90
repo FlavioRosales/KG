@@ -1,8 +1,8 @@
 module fft_lib
     implicit none 
 
-    real(kind=8), parameter :: pi = acos(-1.0d0)
-    complex(kind=8), parameter :: i_unreal = (0.0d0,1.0d0)
+    real(kind=8), parameter :: pii = acos(-1.0d0)
+    complex(kind=8), parameter :: i_img = (0.0d0,1.0d0)
 
 
     interface save_data
@@ -132,7 +132,7 @@ module fft_lib
         do k=0, N-1
             do j=0, N-1
                 DFT_f(k+1) = DFT_f(k+1) +  &
-                            f(j+1)*exp(2.0d0*pi*i_unreal*dble(j*k)/dble(N))
+                            f(j+1)*exp(2.0d0*pii*i_img*dble(j*k)/dble(N))
             end do
         end do
 
@@ -165,10 +165,10 @@ module fft_lib
 
         do k = 0, N/2 -1
             fft_f(k+1) = fft_f_even(k+1) + &
-            exp(2.0d0*pi*i_unreal*dble(k)/dble(N))*fft_f_odd(k+1)
+            exp(2.0d0*pii*i_img*dble(k)/dble(N))*fft_f_odd(k+1)
 
             fft_f(k+1+N/2) = fft_f_even(k+1) - &
-            exp(2.0d0*pi*i_unreal*dble(k)/dble(N))*fft_f_odd(k+1)
+            exp(2.0d0*pii*i_img*dble(k)/dble(N))*fft_f_odd(k+1)
         end do
     else
         fft_f = DFT(f)
@@ -337,14 +337,14 @@ module fft_lib
         Ny = size(f,2)/2
         Nz = size(f,3)/2
     
-        shift_f(1:Nx, 1:Ny, 1:Nz) = f(Nx+1:2*Nx, Ny+1:2*Ny, Nz+1:2*Nz)
-        shift_f(1:Nx, 1:Ny, Nz+1:2*Nz) = f(Nx+1:2*Nx, Ny+1:2*Ny, 1:Nz)
-        shift_f(1:Nx, Ny+1:2*Ny, 1:Nz) = f(Nx+1:2*Nx, 1:Ny, Nz+1:2*Nz)
-        shift_f(1:Nx, Ny+1:2*Ny, Nz+1:2*Nz) = f(Nx+1:2*Nx, 1:Ny, 1:Nz)
-        shift_f(Nx+1:2*Nx, 1:Ny, 1:Nz) = f(1:Nx, Ny+1:2*Ny, Nz+1:2*Nz)
-        shift_f(Nx+1:2*Nx, 1:Ny, Nz+1:2*Nz) = f(1:Nx, Ny+1:2*Ny, 1:Nz)
-        shift_f(Nx+1:2*Nx, Ny+1:2*Ny, 1:Nz) = f(1:Nx, 1:Ny, Nz+1:2*Nz)
-        shift_f(Nx+1:2*Nx, Ny+1:2*Ny, Nz+1:2*Nz) = f(1:Nx, 1:Ny, 1:Nz)
+        shift_f(Nx+1:2*Nx,Ny+1:2*Ny,Nz+1:2*Nz) = f(1:Nx,1:Ny,1:Nz)
+        shift_f(1:Nx,Ny+1:2*Ny,Nz+1:2*Nz) = f(Nx+1:2*Nx,1:Ny,1:Nz)
+        shift_f(Nx+1:2*Nx,1:Ny,Nz+1:2*Nz) = f(1:Nx,Ny+1:2*Ny,1:Nz)
+        shift_f(Nx+1:2*Nx,Ny+1:2*Ny,1:Nz) = f(1:Nx,1:Ny,Nz+1:2*Nz)
+        shift_f(1:Nx,1:Ny,Nz+1:2*Nz) = f(Nx+1:2*Nx,Ny+1:2*Ny,1:Nz)
+        shift_f(Nx+1:2*Nx,1:Ny,1:Nz) = f(1:Nx,Ny+1:2*Ny,Nz+1:2*Nz)
+        shift_f(1:Nx,Ny+1:2*Ny,1:Nz) = f(Nx+1:2*Nx,1:Ny,Nz+1:2*Nz)
+        shift_f(1:Nx,1:Ny,1:Nz) = f(Nx+1:2*Nx,Ny+1:2*Ny,Nz+1:2*Nz)
     
     end function shift_3D
 

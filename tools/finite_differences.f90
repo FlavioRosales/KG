@@ -1,37 +1,125 @@
 module finite_differences
   implicit none
 
+  interface first_derivative_x_2
+    module procedure first_derivative_x_2_uniform, first_derivative_x_2_nonuniform
+  end interface
+
+  interface advec_x
+    module procedure advec_x_uniform, advec_x_nonuniform
+  end interface
+
 contains
 
   !=============================================================================!
   ! first derivatives X
   !=============================================================================!
-  function first_derivative_x_2(f, h) result(df)
+  function first_derivative_x_2_uniform(f, h, bounds) result(df)
     implicit none
     !
     ! input
     !
-    real(kind=8), intent(in) :: f(0:,0:,0:), h
+    integer, intent(in) :: bounds(3,2)
+    complex(kind=8), intent(in) :: f(bounds(1,1):bounds(1,2),bounds(2,1):bounds(2,2),bounds(3,1):bounds(3,2))
+    real(kind=8) :: h
     !
     ! output
     !
-    real(kind=8), dimension(0:size(f,1)-1, 0:size(f,2)-1, 0:size(f,3)-1) :: df
+    complex(kind=8), dimension(bounds(1,1):bounds(1,2),bounds(2,1):bounds(2,2),bounds(3,1):bounds(3,2)) :: df
     !
     ! internal
     !
-    integer :: i, N
+    integer :: i
     real(kind=8) :: res
 
-    N = size(f,1) - 1
+
     res = 0.50d0 / h
 
-    df(0,:,:) = (-3.0d0 * f(0,:,:) + 4.0d0 * f(1,:,:) - f(2,:,:)) * res
-    do i=1, N-1
+    df(bounds(1,1),:,:) = (-3.0d0 * f(bounds(1,1),:,:) + 4.0d0 * f(bounds(1,1) + 1,:,:) - f(bounds(1,1)+2,:,:)) * res
+    do i=bounds(1,1)+1, bounds(1,2)-1
       df(i,:,:) = (-f(i-1,:,:) + f(i+1,:,:)) * res
     end do
-    df(N,:,:) = (+3.0d0 * f(N,:,:) - 4.0d0 * f(N-1,:,:) + f(N-2,:,:)) * res
+    df(bounds(1,2),:,:) = (+3.0d0 * f(bounds(1,2),:,:) - 4.0d0 * f(bounds(1,2)-1,:,:) + f(bounds(1,2)-2,:,:)) * res
 
-  end function first_derivative_x_2
+  end function first_derivative_x_2_uniform
+
+
+  !=============================================================================!
+  ! function first_derivative_x_2_nonuniform(f, x, bounds) result(df)
+  !   implicit none
+  !   !
+  !   ! input
+  !   !
+  !   integer, intent(in) :: bounds(3,2)
+  !   real(kind=8), intent(in) :: f(bounds(1,1):bounds(1,2),bounds(2,1):bounds(2,2),bounds(3,1):bounds(3,2))
+  !   real(kind=8), intent(in) :: x(bounds(1,1):bounds(1,2)) 
+  !   !
+  !   ! output
+  !   !
+  !   real(kind=8), dimension(bounds(1,1):bounds(1,2),bounds(2,1):bounds(2,2),bounds(3,1):bounds(3,2)) :: df
+  !   !
+  !   ! internal
+  !   !
+  !   integer :: i
+  !   real(kind=8) :: h_m, h_p, h1, h2
+
+  !   h1 = x(bounds(1,1)+1) - x(bounds(1,1))
+  !   h2 = x(bounds(1,1)+2) - x(bounds(1,1))
+
+  !   df(bounds(1,1),:,:) = (f(bounds(1,1)+2,:,:)*h1**2 + f(bounds(1,1),:,:)*(h2**2-h1**2) &
+  !                         - f(bounds(1,1)+1,:,:)*h2**2)/(h1*h2*(h2-h1))
+
+  !   do i=bounds(1,1)+1, bounds(1,2)-1
+  !     h_p = x(i+1) - x(i)
+  !     h_m = x(i) - x(i-1)
+  !     df(i,:,:) = (-h_p**2*f(i-1,:,:) + (h_p**2 - h_m**2)*f(i,:,:) + h_m**2*f(i+1,:,:))/(h_m*h_p*(h_m+h_p))
+  !   end do
+
+  !   h1 = x(bounds(1,2)) - x(bounds(1,2)-1)
+  !   h2 = x(bounds(1,2)) - x(bounds(1,2)-2)
+  !   df(bounds(1,2),:,:) = (f(bounds(1,2)-2,:,:)*h1**2 + f(bounds(1,2),:,:)*(h2**2-h1**2) &
+  !                         - f(bounds(1,2)-1,:,:)*h2**2)/(h1*h2*(h2-h1))
+
+  ! end function first_derivative_x_2_nonuniform
+  function first_derivative_x_2_nonuniform(f, x, bounds) result(df)
+    implicit none
+    !
+    ! input
+    !
+    integer, intent(in) :: bounds(3,2)
+    complex(kind=8), intent(in) :: f(bounds(1,1):bounds(1,2), bounds(2,1):bounds(2,2), bounds(3,1):bounds(3,2))
+    real(kind=8), intent(in) :: x(bounds(1,1):bounds(1,2))
+    !
+    ! output
+    !
+    complex(kind=8), dimension(bounds(1,1):bounds(1,2), bounds(2,1):bounds(2,2), bounds(3,1):bounds(3,2)) :: df
+    !
+    ! internal
+    !
+    integer :: i
+    real(kind=8) :: h0, h1, denom
+  
+    ! Forward difference (i = i_min)
+    h0 = x(bounds(1,1)+1) - x(bounds(1,1))
+    h1 = x(bounds(1,1)+2) - x(bounds(1,1)+1)
+    denom = h0 * (h0 + h1)
+    df(bounds(1,1),:,:) = (- (2.0d0*h0 + h1)*f(bounds(1,1),:,:) + (h0 + h1)*f(bounds(1,1)+1,:,:) - h0*f(bounds(1,1)+2,:,:)) / denom
+  
+    ! Central difference (interior points)
+    do i = bounds(1,1)+1, bounds(1,2)-1
+      h0 = x(i)   - x(i-1)
+      h1 = x(i+1) - x(i)
+      denom = h0 * (h0 + h1)
+      df(i,:,:) = (-h1*f(i-1,:,:) + (h1 - h0)*f(i,:,:) + h0*f(i+1,:,:)) / (0.5d0*(h0 + h1)*h0*h1)
+    end do
+  
+    ! Backward difference (i = i_max)
+    h0 = x(bounds(1,2))   - x(bounds(1,2)-1)
+    h1 = x(bounds(1,2)-1) - x(bounds(1,2)-2)
+    denom = h0 * (h0 + h1)
+    df(bounds(1,2),:,:) = ( (2.0d0*h0 + h1)*f(bounds(1,2),:,:) - (h0 + h1)*f(bounds(1,2)-1,:,:) + h0*f(bounds(1,2)-2,:,:)) / denom
+  
+  end function first_derivative_x_2_nonuniform
   !=============================================================================!
   function first_derivative_x_4(f, h) result(df)
     implicit none
@@ -102,31 +190,52 @@ contains
   !=============================================================================!
   ! first derivatives Y
   !=============================================================================!
-  function first_derivative_y_2(f, h) result(df)
+  function first_derivative_y_2(f, h, bounds,inpar) result(df)
     implicit none
     !
     ! input
     !
-    real(kind=8), intent(in) :: f(0:,0:,0:), h
+    integer, intent(in) :: bounds(3,2)
+    complex(kind=8), intent(in) :: f(bounds(1,1):bounds(1,2),bounds(2,1):bounds(2,2),bounds(3,1):bounds(3,2))
+    real(kind=8), intent(in) :: h
+    logical, intent(in) :: inpar
     !
     ! output
     !
-    real(kind=8), dimension(0:size(f,1)-1, 0:size(f,2)-1, 0:size(f,3)-1) :: df
+    complex(kind=8), dimension(bounds(1,1):bounds(1,2),bounds(2,1):bounds(2,2),bounds(3,1):bounds(3,2)) :: df
     !
     ! internal
     !
-    integer :: i, N
+    integer :: i
+    integer :: k, dis, k_target
     real(kind=8) :: res
 
-    N = size(f,2) - 1
-    res = 0.50d0 / h
 
-    df(:,0,:) = (-3.0d0 * f(:,0,:) + 4.0d0 * f(:,1,:) - f(:,2,:)) * res
-    do i=1, N-1
+    res = 0.50d0 / h
+    dis = (bounds(3,2)) / 2
+
+   df(:,bounds(2,1),:) = (-3.0d0 * f(:,bounds(2,1),:) + 4.0d0 * f(:,bounds(2,1)+1,:) - f(:,bounds(2,1)+2,:)) * res
+     do k = bounds(3,1) , bounds(3,2)
+      k_target = mod(k + dis, bounds(3,2) - 1)  
+        if(inpar) then 
+          df(:,bounds(2,1),k) = (f(:,bounds(2,1)+2,k_target) + f(:,bounds(2,1)+1,k))*res
+        else 
+          df(:,bounds(2,1),k) = (-f(:,bounds(2,1)+1,k) + f(:,bounds(2,1)+2,k_target))*res
+        end if  
+     end do
+    
+    do i=bounds(2,1)+1, bounds(2,2)-1
       df(:,i,:) = (-f(:,i-1,:) + f(:,i+1,:)) * res
     end do
-    df(:,N,:) = (+3.0d0 * f(:,N,:) - 4.0d0 * f(:,N-1,:) + f(:,N-2,:)) * res
-
+   df(:,bounds(2,2),:) = (+3.0d0 * f(:,bounds(2,2),:) - 4.0d0 * f(:,bounds(2,2)-1,:) + f(:,bounds(2,2)-2,:)) * res
+    ! do k = bounds(3,1) , bounds(3,2)
+    !   k_target = mod(k + dis, bounds(3,2) - 1) 
+    !     if(inpar) then  
+    !       df(:,bounds(2,2),k) = (-f(:,bounds(2,2)-1,k) - f(:,bounds(2,2)-2,k_target))*res
+    !     else 
+    !       df(:,bounds(2,2),k) = (-f(:,bounds(2,2)-2,k_target) + f(:,bounds(2,2)-1,k))*res
+    !     end if
+    ! end do
   end function first_derivative_y_2
   !=============================================================================!
   function first_derivative_y_4(f, h) result(df)
@@ -198,30 +307,33 @@ contains
   !=============================================================================!
   ! first derivatives Z
   !=============================================================================!
-  function first_derivative_z_2(f, h) result(df)
+  function first_derivative_z_2(f, h, bounds) result(df)
     implicit none
     !
     ! input
     !
-    real(kind=8), intent(in) :: f(0:,0:,0:), h
+    integer, intent(in) :: bounds(3,2)
+    complex(kind=8), intent(in) :: f(bounds(1,1):bounds(1,2),bounds(2,1):bounds(2,2),bounds(3,1):bounds(3,2))
+    real(kind=8), intent(in) :: h
     !
     ! output
     !
-    real(kind=8), dimension(0:size(f,1)-1, 0:size(f,2)-1, 0:size(f,3)-1) :: df
+    complex(kind=8), dimension(bounds(1,1):bounds(1,2),bounds(2,1):bounds(2,2),bounds(3,1):bounds(3,2)) :: df
     !
     ! internal
     !
-    integer :: i, N
+    integer :: i
     real(kind=8) :: res
 
-    N = size(f,3) - 1
     res = 0.50d0 / h
 
-    df(:,:,0) = (-3.0d0 * f(:,:,0) + 4.0d0 * f(:,:,1) - f(:,:,2)) * res
-    do i=1, N-1
+   ! df(:,:,bounds(3,1)) = (-3.0d0 * f(:,:,bounds(3,1)) + 4.0d0 * f(:,:,bounds(3,1)+1) - f(:,:,bounds(3,1)+2)) * res
+    df(:,:,bounds(3,1)) = (-f(:,:,bounds(3,2)-2)+f(:,:,bounds(3,1)+1))*res
+    do i=bounds(3,1)+1, bounds(3,2)-1
       df(:,:,i) = (-f(:,:,i-1) + f(:,:,i+1)) * res
     end do
-    df(:,:,N) = (+3.0d0 * f(:,:,N) - 4.0d0 * f(:,:,N-1) + f(:,:,N-2)) * res
+    df(:,:,bounds(3,2)) = (-f(:,:,bounds(3,1)+2)+f(:,:,bounds(3,2)-1))*res
+    !df(:,:,bounds(3,2)) = (+3.0d0 * f(:,:,bounds(3,2)) - 4.0d0 * f(:,:,bounds(3,2)-1) + f(:,:,bounds(3,2)-2)) * res
 
   end function first_derivative_z_2
   !=============================================================================!
@@ -292,9 +404,6 @@ contains
 
   end function first_derivative_z_6
   !=============================================================================!
-
-
-
   !=============================================================================!
   ! second derivatives XX
   !=============================================================================!
@@ -596,8 +705,6 @@ contains
 
   end function second_derivative_zz_6
   !=============================================================================!
-
-
   !=============================================================================!
   ! Laplacian
   !=============================================================================!
@@ -657,7 +764,162 @@ contains
 
   end function Laplacian_6
  !=============================================================================!
-function advec_x(f, beta, dx) result(df)
+  function advec_x_uniform(f, beta, dx, bounds) result(df)
+    implicit none
+    ! Input
+    integer, intent(in) :: bounds(3,2)
+    complex(kind=8), intent(in) :: f(bounds(1,1):bounds(1,2),bounds(2,1):bounds(2,2),bounds(3,1):bounds(3,2))
+    real(kind=8), intent(in) :: beta(bounds(1,1):bounds(1,2),bounds(2,1):bounds(2,2),bounds(3,1):bounds(3,2)), dx
+    ! Output
+    complex(kind=8), dimension(bounds(1,1):bounds(1,2),bounds(2,1):bounds(2,2),bounds(3,1):bounds(3,2)) :: df
+    ! Internal
+    real(kind=8) :: res
+    integer :: i, j, k
+
+    res = 0.5d0 / dx
+
+    df(bounds(1,1),:,:) = (-3.0d0 * f(bounds(1,1),:,:) + 4.0d0 * f(bounds(1,1)+1,:,:) - f(bounds(1,1)+2,:,:)) * res
+    df(bounds(1,1)+1,:,:) = (-3.0d0 * f(bounds(1,1)+1,:,:) + 4.0d0 * f(bounds(1,1)+2,:,:) - f(bounds(1,1)+3,:,:)) * res
+
+    do k = bounds(3,1), bounds(3,2)
+      do j = bounds(2,1), bounds(2,2)
+        do i = bounds(1,1)+2, bounds(1,2)-2
+          if (beta(i,j,k) > 0.0d0) then
+            df(i,j,k) = (-3.0d0 * f(i,j,k) + 4.0d0 * f(i+1,j,k) - f(i+2,j,k)) * res
+          else if (beta(i,j,k) < 0.0d0) then
+            df(i,j,k) = (3.0d0 * f(i,j,k) - 4.0d0 * f(i-1,j,k) + f(i-2,j,k)) * res 
+          else
+            df(i,j,k) = (f(i+1,j,k) - f(i-1,j,k)) * res
+          end if
+        end do
+      end do
+    end do
+
+    df(bounds(1,2)-1,:,:) = (f(bounds(1,2),:,:)-f(bounds(1,2)-2,:,:))*res
+    df(bounds(1,2),:,:) = (3.0d0 * f(bounds(1,2),:,:) - 4.0d0 * f(bounds(1,2)-1,:,:) + f(bounds(1,2)-2,:,:)) * res
+
+  end function advec_x_uniform
+ !=============================================================================!
+  ! function advec_x_nonuniform(f, beta, x, bounds) result(df)
+  !   implicit none
+  !   ! Input
+  !   integer, intent(in) :: bounds(3,2)
+  !   real(kind=8), intent(in) :: f(bounds(1,1):bounds(1,2),bounds(2,1):bounds(2,2),bounds(3,1):bounds(3,2)), &
+  !                               beta(bounds(1,1):bounds(1,2),bounds(2,1):bounds(2,2),bounds(3,1):bounds(3,2)), &
+  !                               x(bounds(1,1):bounds(1,2))
+
+  !   ! Output
+  !   real(kind=8), dimension(bounds(1,1):bounds(1,2),bounds(2,1):bounds(2,2),bounds(3,1):bounds(3,2)) :: df
+  !   ! Internal
+  !   integer :: i, j, k
+  !   real(kind=8) :: h_m, h_p, h1, h2
+
+  !   h1 = x(bounds(1,1)+1) - x(bounds(1,1))
+  !   h2 = x(bounds(1,1)+2) - x(bounds(1,1))
+
+  !   df(bounds(1,1),:,:) = (f(bounds(1,1)+2,:,:)*h1**2 + f(bounds(1,1),:,:)*(h2**2-h1**2) &
+  !                         - f(bounds(1,1)+1,:,:)*h2**2)/(h1*h2*(h2-h1))
+
+  !   h1 = x(bounds(1,1)+2) - x(bounds(1,1)+1)
+  !   h2 = x(bounds(1,1)+3) - x(bounds(1,1)+1)
+
+  !   df(bounds(1,1)+1,:,:) = (f(bounds(1,1)+3,:,:)*h1**2 + f(bounds(1,1)+1,:,:)*(h2**2-h1**2) &
+  !                           - f(bounds(1,1)+2,:,:)*h2**2)/(h1*h2*(h2-h1))
+
+  !   do k = bounds(3,1), bounds(3,2)
+  !     do j = bounds(2,1), bounds(2,2)
+  !       do i = bounds(1,1)+2, bounds(1,2)-2
+  !         if (beta(i,j,k) > 0.0d0) then
+  !           h1 = x(i+1) - x(i)
+  !           h2 = x(i+2) - x(i)
+  !           df(i,j,k) = (f(i+2,j,k)*h1**2 + f(i,j,k)*(h2**2-h1**2) - f(i+1,j,k)*h2**2)/(h1*h2*(h2-h1))
+  !         else if (beta(i,j,k) < 0.0d0) then
+  !           h1 = x(i) - x(i-1)
+  !           h2 = x(i) - x(i-2)
+  !           df(i,j,k) = (f(i-2,j,k)*h1**2 + f(i,j,k)*(h2**2-h1**2) - f(i-1,j,k)*h2**2)/(h1*h2*(h2-h1))        
+  !         else
+  !           h_p = x(i+1) - x(i)
+  !           h_m = x(i) - x(i-1)
+  !           df(i,j,k) = (-h_p**2*f(i-1,j,k) + (h_p**2 - h_m**2)*f(i,j,k) + h_m**2*f(i+1,j,k))/(h_m*h_p*(h_m+h_p))
+  !         end if
+  !       end do
+  !     end do
+  !   end do
+
+  !   h_p = x(bounds(1,2)) - x(bounds(1,2)-1)
+  !   h_m = x(bounds(1,2)-1) - x(bounds(1,2)-2)
+  !   df(bounds(1,2)-1,:,:) = (-h_p**2*f(bounds(1,2)-2,:,:) + (h_p**2 - h_m**2)*f(bounds(1,2)-1,:,:) & 
+  !                         + h_m**2*f(bounds(1,2),:,:))/(h_m*h_p*(h_m+h_p))
+  !   h1 = x(bounds(1,2)) - x(bounds(1,2)-1)
+  !   h2 = x(bounds(1,2)) - x(bounds(1,2)-2)
+  !   df(bounds(1,2),:,:) = (f(bounds(1,2)-2,:,:)*h1**2 + f(bounds(1,2),:,:)*(h2**2-h1**2) &
+  !                         - f(bounds(1,2)-1,:,:)*h2**2)/(h1*h2*(h2-h1))
+  ! end function advec_x_nonuniform
+
+  function advec_x_nonuniform(f, beta, x, bounds) result(df)
+    implicit none
+    ! Input
+    integer, intent(in) :: bounds(3,2)
+    complex(kind=8), intent(in) :: f(bounds(1,1):bounds(1,2), bounds(2,1):bounds(2,2), bounds(3,1):bounds(3,2))
+    real(kind=8), intent(in) :: beta(bounds(1,1):bounds(1,2), bounds(2,1):bounds(2,2), bounds(3,1):bounds(3,2))
+    real(kind=8), intent(in) :: x(bounds(1,1):bounds(1,2))
+    ! Output
+    complex(kind=8), dimension(bounds(1,1):bounds(1,2), bounds(2,1):bounds(2,2), bounds(3,1):bounds(3,2)) :: df
+    ! Internal
+    integer :: i, j, k
+    real(kind=8) :: h0, h1, denom
+  
+    ! Frontera izquierda (i = i_min)
+    h0 = x(bounds(1,1)+1) - x(bounds(1,1))
+    h1 = x(bounds(1,1)+2) - x(bounds(1,1)+1)
+    denom = h0 * (h0 + h1)
+    df(bounds(1,1),:,:) = (- (2.0d0*h0 + h1)*f(bounds(1,1),:,:) &
+                          + (h0 + h1)*f(bounds(1,1)+1,:,:) - h0*f(bounds(1,1)+2,:,:)) / denom
+  
+    ! Segundo punto (usamos también forward, ya que el esquema necesita dos antes del centro)
+    h0 = x(bounds(1,1)+2) - x(bounds(1,1)+1)
+    h1 = x(bounds(1,1)+3) - x(bounds(1,1)+2)
+    denom = h0 * (h0 + h1)
+    df(bounds(1,1)+1,:,:) = (- (2.0d0*h0 + h1)*f(bounds(1,1)+1,:,:) &
+                         + (h0 + h1)*f(bounds(1,1)+2,:,:) - h0*f(bounds(1,1)+3,:,:)) / denom
+  
+    ! Interior
+    do k = bounds(3,1), bounds(3,2)
+      do j = bounds(2,1), bounds(2,2)
+        do i = bounds(1,1)+2, bounds(1,2)-2
+          if (beta(i,j,k) > 0.0d0) then
+            h0 = x(i+1) - x(i)
+            h1 = x(i+2) - x(i+1)
+            denom = h0 * (h0 + h1)
+            df(i,j,k) = (- (2.0d0*h0 + h1)*f(i,j,k) + (h0 + h1)*f(i+1,j,k) - h0*f(i+2,j,k)) / denom
+          else if (beta(i,j,k) < 0.0d0) then
+            h0 = x(i)   - x(i-1)
+            h1 = x(i-1) - x(i-2)
+            denom = h0 * (h0 + h1)
+            df(i,j,k) = ((2.0d0*h0 + h1)*f(i,j,k) - (h0 + h1)*f(i-1,j,k) + h0*f(i-2,j,k)) / denom
+          else
+            h0 = x(i)   - x(i-1)
+            h1 = x(i+1) - x(i)
+            df(i,j,k) = (-h1*f(i-1,j,k) + (h1 - h0)*f(i,j,k) + h0*f(i+1,j,k)) / (0.5d0*(h0 + h1)*h0*h1)
+          end if
+        end do
+      end do
+    end do
+  
+    ! Penúltimo punto (central simple entre f_N y f_{N-2})
+    h0 = x(bounds(1,2)-1) - x(bounds(1,2)-2)
+    h1 = x(bounds(1,2)) - x(bounds(1,2)-1)
+    df(bounds(1,2)-1,:,:) = (f(bounds(1,2),:,:) - f(bounds(1,2)-2,:,:)) / (h0 + h1)
+  
+    ! Último punto (i = i_max)
+    h0 = x(bounds(1,2)) - x(bounds(1,2)-1)
+    h1 = x(bounds(1,2)-1) - x(bounds(1,2)-2)
+    denom = h0 * (h0 + h1)
+    df(bounds(1,2),:,:) = ((2.0d0*h0 + h1)*f(bounds(1,2),:,:) - (h0 + h1)*f(bounds(1,2)-1,:,:) + h0*f(bounds(1,2)-2,:,:)) / denom
+  
+  end function advec_x_nonuniform  
+ !=============================================================================!
+function advec_x_4(f, beta,dx) result(df)
   implicit none
   ! Input
   real(kind=8), intent(in) :: f(0:,0:,0:), beta(0:,0:,0:), dx
@@ -667,32 +929,35 @@ function advec_x(f, beta, dx) result(df)
   real(kind=8) :: res
   integer :: i, j, k, N
 
-  res = 0.5d0 / dx
-  N = size(f,1) - 1
+  N = size(f,1)-1
 
-  df(0,:,:) = (-3.0d0 * f(0,:,:) + 4.0d0 * f(1,:,:) - f(2,:,:)) * res
-  df(N,:,:) = (3.0d0 * f(N,:,:) - 4.0d0 * f(N-1,:,:) + f(N-2,:,:)) * res
+  res = 1.0d0/dx
 
-  do k = 0, size(f,3)-1
-    do j = 0, size(f,2)-1
-      do i = 1, N-1
-        if (beta(i,j,k) > 0.0d0) then
-          df(i,j,k) = merge((f(i+1,j,k) - f(i,j,k)) / dx, &
-                            (-3.0d0 * f(i,j,k) + 4.0d0 * f(i+1,j,k) - f(i+2,j,k)) * res, &
-                            i == N-1)
-        else if (beta(i,j,k) == 0.0d0) then
-          df(i,j,k) = (f(i+1,j,k) - f(i-1,j,k)) * res
-        else
-          df(i,j,k) = merge((f(i,j,k) - f(i-1,j,k)) / dx, &
-                            (3.0d0 * f(i,j,k) - 4.0d0 * f(i-1,j,k) + f(i-2,j,k)) * res, &
-                            i == 1)
-        end if
-      end do
-    end do
+  df(0,:,:) = (-25.0d0 * f(0,:,:) + 48.0d0 * f(1,:,:) - 36.0d0 * f(2,:,:) + 16.0d0 * f(3,:,:) - 3.0d0 * f(4,:,:)) * res / 12.0d0
+  df(1,:,:) = (-3.0d0 * f(0,:,:) - 10.0d0 * f(1,:,:) + 18.0d0 * f(2,:,:) - 6.0d0 * f(3,:,:) + f(4,:,:)) * res / 12.0d0
+  df(2,:,:) = (f(0,:,:) - 8.0d0 * f(1,:,:) + 8.0d0 * f(3,:,:) - f(4,:,:)) * res / 12.0d0
+  do j=0, size(f,2)-1
+  do k=0, size(f,3)-1
+  do i=3, N-3
+    if(beta(i,j,k) < 0.0d0) then
+      df(i,j,k) = (3.0d0 * f(i+1,j,k) + 10.0d0 * f(i,j,k) - 18.0d0 * f(i-1,j,k) + 6.0d0 * f(i-2,j,k) - f(i-3,j,k)) * res / 12.0d0
+    else if(beta(i,j,k) > 0.0d0) then
+      df(i,j,k) = (-3.0d0 * f(i-1,j,k) - 10.0d0 * f(i,j,k) + 18.0d0 * f(i+1,j,k) - 6.0d0 * f(i+2,j,k) + f(i+3,j,k)) * res / 12.0d0
+    else
+      df(i,j,k) = (f(i-2,j,k) - 8.0d0 * f(i-1,j,k) + 8.0d0 * f(i+1,j,k) - f(i+2,j,k)) * res / 12.0d0
+    end if
   end do
+  end do
+  end do
+  df(N-2,:,:) = (f(N-4,:,:) - 8.0d0 * f(N-3,:,:) + 8.0d0 * f(N-1,:,:) - f(N,:,:)) * res / 12.0d0
+  df(N-1,:,:) = (3.0d0 * f(N,:,:) + 10.0d0 * f(N-1,:,:) - 18.0d0 * f(N-2,:,:) + 6.0d0 * f(N-3,:,:) - f(N-4,:,:)) * res / 12.0d0
+  df(N  ,:,:) = (25.0d0 * f(N,:,:) - 48.0d0 * f(N-1,:,:) + 36.0d0 * f(N-2,:,:) &
+              - 16.0d0 * f(N-3,:,:) + 3.0d0 * f(N-4,:,:)) * res / 12.0d0
 
-end function advec_x
+end function advec_x_4
+
 !=============================================================================!
+
 
 function advec_y(f, beta, dy) result(df)
   implicit none
@@ -709,20 +974,17 @@ function advec_y(f, beta, dy) result(df)
 
   df(:,0,:) = (-3.0d0 * f(:,0,:) + 4.0d0 * f(:,1,:) - f(:,2,:)) * res
   df(:,N,:) = (3.0d0 * f(:,N,:) - 4.0d0 * f(:,N-1,:) + f(:,N-2,:)) * res
-
+  df(:,1,:) = (f(:,2,:)-f(:,0,:))*res
+  df(:,N-1,:) = (f(:,N,:)-f(:,N-2,:))*res
   do k = 0, size(f,3)-1
     do i = 0, size(f,1)-1
-      do j = 1, N-1
+      do j = 2, N-2
         if (beta(i,j,k) > 0.0d0) then
-          df(i,j,k) = merge((f(i,j+1,k) - f(i,j,k)) / dy, &
-                            (-3.0d0 * f(i,j,k) + 4.0d0 * f(i,j+1,k) - f(i,j+2,k)) * res, &
-                            j == N-1)
-        else if (beta(i,j,k) == 0.0d0) then
-          df(i,j,k) = (f(i,j+1,k) - f(i,j-1,k)) * res
+          df(i,j,k) = (-3.0d0 * f(i,j,k) + 4.0d0 * f(i,j+1,k) - f(i,j+2,k)) * res
+        else if (beta(i,j,k) < 0.0d0) then
+          df(i,j,k) =  (3.0d0 * f(i,j,k) - 4.0d0 * f(i,j-1,k) + f(i,j-2,k)) * res
         else
-          df(i,j,k) = merge((f(i,j,k) - f(i,j-1,k)) / dy, &
-                            (3.0d0 * f(i,j,k) - 4.0d0 * f(i,j-1,k) + f(i,j-2,k)) * res, &
-                            j == 1)
+          df(i,j,k) = (f(i,j+1,k) - f(i,j-1,k)) * res
         end if
       end do
     end do
@@ -746,20 +1008,18 @@ function advec_z(f, beta, dz) result(df)
 
   df(:,:,0) = (-3.0d0 * f(:,:,0) + 4.0d0 * f(:,:,1) - f(:,:,2)) * res
   df(:,:,N) = (3.0d0 * f(:,:,N) - 4.0d0 * f(:,:,N-1) + f(:,:,N-2)) * res
-
+  df(:,:,1) = (f(:,:,2)-f(:,:,0))*res
+  df(:,:,N-1) = (f(:,:,N)-f(:,:,N-2))*res
+  
   do j = 0, size(f,2)-1
     do i = 0, size(f,1)-1
-      do k = 1, N-1
+      do k = 2, N-2
         if (beta(i,j,k) > 0.0d0) then
-          df(i,j,k) = merge((f(i,j,k+1) - f(i,j,k)) / dz, &
-                            (-3.0d0 * f(i,j,k) + 4.0d0 * f(i,j,k+1) - f(i,j,k+2)) * res, &
-                            k == N-1)
-        else if (beta(i,j,k) == 0.0d0) then
-          df(i,j,k) = (f(i,j,k+1) - f(i,j,k-1)) * res
+          df(i,j,k) = (-3.0d0 * f(i,j,k) + 4.0d0 * f(i,j,k+1) - f(i,j,k+2)) * res
+        else if (beta(i,j,k) < 0.0d0) then
+          df(i,j,k) = (3.0d0 * f(i,j,k) - 4.0d0 * f(i,j,k-1) + f(i,j,k-2)) * res
         else
-          df(i,j,k) = merge((f(i,j,k) - f(i,j,k-1)) / dz, &
-                            (3.0d0 * f(i,j,k) - 4.0d0 * f(i,j,k-1) + f(i,j,k-2)) * res, &
-                            k == 1)
+          df(i,j,k) = (f(i,j,k+1) - f(i,j,k-1)) * res
         end if
       end do
     end do

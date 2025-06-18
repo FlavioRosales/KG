@@ -14,6 +14,13 @@ contains
 
   end subroutine save_t
 
+  subroutine save_k(axis, f, name)
+    implicit none
+    real(kind=8), dimension(:), intent(in) :: axis, f
+    character(len=*), intent(in) :: name
+      call save1d_k(axis, f, name + '.k.asc')
+  end subroutine save_k
+
   subroutine save_x(axis, f, name)
     implicit none
     real(kind=8), dimension(:), intent(in) :: axis, f
@@ -29,6 +36,16 @@ contains
     call save1d(axis, f, name + '_' + str(rank+1) + '.y.asc')
 
   end subroutine save_y
+
+  subroutine save_a(f, name, l_max)
+    implicit none
+    integer, intent(in) :: l_max
+    complex(kind=8),intent(in) ::  f(0:l_max,-l_max:l_max)
+    character(len=*), intent(in) :: name
+
+    call savealm( f, name + '.lm.asc',l_max)
+
+  end subroutine save_a
 
   subroutine save_z(axis, f, name)
     implicit none
